@@ -65,6 +65,9 @@ private:
   Buffer2MemInfoMap &buffer2MemInfoMap_;
   MemoryDependentAnalyzer &memAnalyzer_;
   SyncAnalysisMode mode_;
+  // 单条指令的精确读范围不能改写源Tile的全局alias映射。Translator在整个
+  // InsertSync分析/移动/分配/生成期间存活，此处持有Compound.useVec引用的对象。
+  SmallVector<std::unique_ptr<BaseMemInfo>> preciseReadRegions_;
  
   // --- 递归遍历逻辑 ---
   void RecursionIR(Region *region);
@@ -112,6 +115,8 @@ private:
 
   // 根据 Values 填充 Def/Use 列表
   void UpdateDefUseVec(ValueRange values, SmallVector<const BaseMemInfo *> &vec);
+  bool UpdateTExtractReadRegion(Operation *op, Value source,
+                               SmallVector<const BaseMemInfo *> &vec);
 
   // 调试辅助
   std::string getPipelineName(PipelineType pipe) const;
