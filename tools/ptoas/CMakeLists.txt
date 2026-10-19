@@ -114,6 +114,19 @@ set(PTOAS_RUNTIME_LINK_LIBS
   MLIRTransformUtils
 )
 
+# This local compiler worktree reuses an existing LLVM build without Python
+# bindings. Keep the CLI on the same runPTOAS driver and lowering pipeline.
+if(NOT PTO_ENABLE_PYTHON_BINDING)
+  add_executable(ptoas-native ptoas_cli_main.cpp ${PTOAS_RUNTIME_SOURCES})
+  ptoas_configure_runtime_compile_target(ptoas-native)
+  llvm_update_compile_flags(ptoas-native)
+  target_link_libraries(ptoas-native PRIVATE ${PTOAS_RUNTIME_LINK_LIBS})
+  set_target_properties(ptoas-native PROPERTIES
+    OUTPUT_NAME ptoas
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
+  return()
+endif()
+
 # This aggregation root owns all compiler and PTO Python binding objects. The
 # final shared library is declared earlier as PTOASCompiler; AddMLIR resolves
 # this forward target relationship during generation.
