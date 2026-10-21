@@ -1,0 +1,28 @@
+// RUN: ptoas --pto-arch=a3 %s -o - | FileCheck %s
+// RUN: not ptoas --pto-arch=a5 %s -o - 2>&1 | FileCheck %s --check-prefix=A5
+
+module {
+  func.func @wait_backoff(%signal_ptr: !pto.ptr<i32>, %expected: i32) {
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+    %view = pto.make_tensor_view %signal_ptr, shape = [%c1], strides = [%c1] : !pto.tensor_view<1xi32>
+    %signal = pto.partition_view %view, offsets = [%c0], sizes = [%c1] : !pto.tensor_view<1xi32> -> !pto.partition_tensor_view<1xi32>
+    pto.comm.twait(%signal, %expected : !pto.partition_tensor_view<1xi32>, i32) {cmp = #pto<wait_cmp ge>, backoffTicks = 150 : i64}
+    pto.comm.twait(%signal, %expected : !pto.partition_tensor_view<1xi32>, i32) {cmp = #pto<wait_cmp ge>}
+    pto.comm.twait(%signal, %expected : !pto.partition_tensor_view<1xi32>, i32) {cmp = #pto<wait_cmp eq>, backoffTicks = 0 : i64}
+    return
+  }
+}
+
+// CHECK: static AICORE inline void PTOAS__WAIT_GE_BACKOFF(
+// CHECK: volatile __gm__ int32_t*
+// CHECK: dcci((__gm__ void*)ptr, cache_line_t::SINGLE_CACHE_LINE);
+// CHECK: if (*ptr >= expected)
+// CHECK-NEXT: break;
+// CHECK: get_sys_cnt()
+// CHECK: < BackoffTicks
+// CHECK-LABEL: AICORE void wait_backoff(
+// CHECK: PTOAS__WAIT_GE_BACKOFF<150>(
+// CHECK: pto::comm::TWAIT(
+// CHECK: pto::comm::TWAIT(
+// A5: positive backoffTicks currently requires A3

@@ -37,7 +37,7 @@ static void populateTensorFamilyPatterns(RewritePatternSet &patterns,
   populateTensorTExpPatterns(patterns, typeConverter, ctx);
   populateTensorTExtractInsertPatterns(patterns, typeConverter, ctx);
   populateTensorTFillPadPatterns(patterns, typeConverter, ctx);
-  populateTensorTGatherPatterns(patterns, typeConverter, ctx);
+  populateTensorTGatherPatterns(patterns, typeConverter, ctx, targetArch);
   populateTensorTMinMaxPatterns(patterns, typeConverter, ctx);
   populateTensorTMovPatterns(patterns, typeConverter, ctx);
   populateTensorTMulPatterns(patterns, typeConverter, ctx);

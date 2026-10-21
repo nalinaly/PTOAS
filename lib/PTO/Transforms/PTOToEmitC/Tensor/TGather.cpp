@@ -20,7 +20,10 @@ namespace mlir {
 namespace pto {
 
 struct PTOGatherToEmitC : public OpConversionPattern<pto::TGatherOp> {
-  using OpConversionPattern<pto::TGatherOp>::OpConversionPattern;
+  PTOGatherToEmitC(TypeConverter &converter, MLIRContext *ctx, PTOArch arch)
+      : OpConversionPattern<pto::TGatherOp>(converter, ctx), targetArch(arch) {}
+
+  PTOArch targetArch;
 
   LogicalResult matchAndRewrite(pto::TGatherOp op, OpAdaptor adaptor,
                                 ConversionPatternRewriter &rewriter) const override {
@@ -148,7 +151,8 @@ struct PTOGatherToEmitC : public OpConversionPattern<pto::TGatherOp> {
     });
 
     rewriter.create<emitc::CallOpaqueOp>(
-        loc, TypeRange{}, "TGATHER",
+        loc, TypeRange{}, targetArch == PTOArch::A3
+                              ? "PTOAS__GATHER_COMPARE_SCALAR" : "TGATHER",
         /*args=*/ArrayAttr{}, /*templateArgs=*/targs,
         /*operands=*/ValueRange{dst, src0, kValue, tmp, cdst, offsetVal});
 
@@ -179,8 +183,9 @@ struct PTOGatherbToEmitC : public OpConversionPattern<pto::TGatherBOp> {
 };
 
 void populateTensorTGatherPatterns(RewritePatternSet &patterns,
-                        TypeConverter &typeConverter, MLIRContext *ctx) {
-  patterns.add<PTOGatherToEmitC>(typeConverter, ctx);
+                        TypeConverter &typeConverter, MLIRContext *ctx,
+                        PTOArch targetArch) {
+  patterns.add<PTOGatherToEmitC>(typeConverter, ctx, targetArch);
   patterns.add<PTOGatherbToEmitC>(typeConverter, ctx);
 }
 

@@ -12,6 +12,8 @@
 #include "PTOToEmitCPatterns.h"
 #include "PTO/Transforms/Passes.h"
 #include <set>
+#include "ScalarMisc/SignalWaitBackoffSupport.h"
+#include "Tensor/GatherCompareScalarSupport.h"
 
 #include "mlir/Target/Cpp/CppEmitter.h"
 
@@ -696,6 +698,17 @@ struct EmitPTOManualPass
           return failure();
       }
       pto::annotatePTOEntryFunctions(mop);
+      if (targetArch != PTOArch::A3) {
+          bool unsupportedBackoff = false;
+          mop.walk([&](pto::TWaitOp wait) {
+              if (auto ticks = wait.getBackoffTicksAttr(); ticks && ticks.getInt() > 0) {
+                  wait.emitError("positive backoffTicks currently requires A3");
+                  unsupportedBackoff = true;
+              }
+          });
+          if (unsupportedBackoff)
+              return failure();
+      }
 
       // A3 requires explicit FFTS base setup for inter-core sync ops.
       if (targetArch == PTOArch::A3) {
@@ -728,6 +741,10 @@ struct EmitPTOManualPass
       builder.setInsertionPointToStart(mop.getBody());
       emitPreambleIncludesAndStructs(mop, builder, flags);
       emitPreambleRuntimeHelpers(mop, builder, flags);
+      if (targetArch == PTOArch::A3 && flags.gatherCompareScalar) {
+        builder.create<emitc::VerbatimOp>(
+            mop->getLoc(), builder.getStringAttr(kGatherCompareScalarSupport));
+      }
       emitPreambleTailHelpers(mop, builder, flags);
   }
 
@@ -739,9 +756,19 @@ struct EmitPTOManualPass
     bool bitcast = false;
     bool convTileInit = false;
     bool debugHeader = false;
+    bool gatherCompareScalar = false;
+    bool signalWaitBackoff = false;
   };
 
   static void setHelperFlagsForOp(Operation *op, HelperFlags &flags) {
+    if (auto wait = dyn_cast<mlir::pto::TWaitOp>(op)) {
+      if (auto ticks = wait.getBackoffTicksAttr(); ticks && ticks.getInt() > 0)
+        flags.signalWaitBackoff = true;
+    }
+    if (auto gather = dyn_cast<mlir::pto::TGatherOp>(op)) {
+      if (gather.getCdst())
+        flags.gatherCompareScalar = true;
+    }
     if (isa<mlir::pto::AssertOp>(op)) {
       flags.debugHeader = true;
     }
@@ -860,6 +887,9 @@ static AICORE inline void PTOAS__INIT_CONVTILE_CONFIG(
   static void emitPreambleRuntimeHelpers(ModuleOp mop, OpBuilder &builder,
                                          const HelperFlags &flags) {
     Location loc = mop->getLoc();
+    if (flags.signalWaitBackoff) {
+        builder.create<emitc::VerbatimOp>(loc, builder.getStringAttr(kSignalWaitBackoffSupport));
+    }
     if (flags.globalTensorData) {
       builder.create<emitc::VerbatimOp>(
           loc, builder.getStringAttr(R"cpp(

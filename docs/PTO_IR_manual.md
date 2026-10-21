@@ -10615,7 +10615,7 @@ pto.comm.tget(%dst, %src, buf(%ping, %pong) : !pto.partition_tensor_view<128xf32
 | Op | Operands | Attributes | Result |
 |----|----------|------------|--------|
 | `pto.comm.tnotify` | `signal`, `value` | `notifyOp = #pto<notify_op atomic_add>` or `#pto<notify_op set>` | none |
-| `pto.comm.twait` | `signal`, `cmpValue` | `cmp = #pto<wait_cmp eq/ne/gt/ge/lt/le>` | none |
+| `pto.comm.twait` | `signal`, `cmpValue` | `cmp = #pto<wait_cmp eq/ne/gt/ge/lt/le>`, optional `backoffTicks : i64` | none |
 | `pto.comm.ttest` | `signal`, `cmpValue` | `cmp = #pto<wait_cmp eq/ne/gt/ge/lt/le>` | `i1` |
 
 **Constraints & Verification:**
@@ -10641,6 +10641,16 @@ pto.comm.tnotify(%sig, %v : !pto.partition_tensor_view<1xi32>, i32) {notifyOp = 
 pto.comm.twait(%sig, %v : !pto.partition_tensor_view<1xi32>, i32) {cmp = #pto<wait_cmp ge>}
 %ok = pto.comm.ttest(%sig, %v : !pto.partition_tensor_view<1xi32>, i32) {cmp = #pto<wait_cmp eq>} -> i1
 ```
+
+On A3, positive `backoffTicks` selects local single-signal polling with a delay
+after each unsuccessful read. It requires `ge`, a statically single-element
+GM `i32` view, and a value in `[1, INT32_MAX]`. Each read still invalidates the
+signal cache line and uses a volatile load. The first read is immediate; signal
+publication, payload cache maintenance and non-consuming wait semantics are
+unchanged. The delay is measured in `get_sys_cnt()` ticks, not microseconds,
+and requires an advancing hardware counter. Missing or zero `backoffTicks`
+retains the existing `pto::comm::TWAIT` lowering. This option is not supported
+on A5 or for vector-valued signals.
 
 ---
 

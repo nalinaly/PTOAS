@@ -61,7 +61,8 @@ void populateTensorTExtractInsertPatterns(RewritePatternSet &patterns,
 void populateTensorTFillPadPatterns(RewritePatternSet &patterns,
                         TypeConverter &typeConverter, MLIRContext *ctx);
 void populateTensorTGatherPatterns(RewritePatternSet &patterns,
-                        TypeConverter &typeConverter, MLIRContext *ctx);
+                        TypeConverter &typeConverter, MLIRContext *ctx,
+                        PTOArch targetArch);
 void populateTensorTMinMaxPatterns(RewritePatternSet &patterns,
                         TypeConverter &typeConverter, MLIRContext *ctx);
 void populateTensorTMovPatterns(RewritePatternSet &patterns,

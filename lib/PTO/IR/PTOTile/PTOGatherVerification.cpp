@@ -246,8 +246,9 @@ static LogicalResult verifyTGatherCompareElementTypes(TGatherOp op,
   }
   auto cmpAttr = op.getCmpModeAttr();
   auto cmpMode = cmpAttr ? cmpAttr.getValue() : pto::CmpMode::EQ;
-  if (cmpMode != pto::CmpMode::EQ && cmpMode != pto::CmpMode::GT) {
-    return op.emitOpError("expects compare-form tgather cmpMode to be eq or gt");
+  if (cmpMode != pto::CmpMode::EQ && cmpMode != pto::CmpMode::GT &&
+      !(cmpMode == pto::CmpMode::GE && !allowA5SrcTypes)) {
+    return op.emitOpError("expects compare-form tgather cmpMode to be eq or gt (A2/A3 also supports ge)");
   }
   return verifyTGatherCompareSrcType(op, srcElem, cmpMode, allowA5SrcTypes);
 }
